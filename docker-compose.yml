@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: qtra-zookeeper
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - qtra-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: qtra-kafka
+    restart: always
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: qtra-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://qtra-kafka:9092  # Use service name inside Docker network
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - qtra-network
+
+  mysql:
+    image: mysql:8
+    container_name: qtra-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: qtra_db
+      MYSQL_USER: qtra_user
+      MYSQL_PASSWORD: qtra_pass
+    ports:
+      - "3306:3306"
+    networks:
+      - qtra-network
+
+  qtra-app:
+    build: .
+    container_name: qtra-scanner
+    restart: always
+    depends_on:
+      - kafka
+      - mysql
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://qtra-mysql:3306/qtra_db?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: qtra_user
+      SPRING_DATASOURCE_PASSWORD: qtra_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: qtra-kafka:9092  # Ensure this matches your Spring Boot config
+    ports:
+      - "8080:8080"
+    networks:
+      - qtra-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  qtra-network:
+    driver: bridge
