@@ -1,141 +1,137 @@
 package com.qtra.scanner.service;
 
-//import com.fasterxml.jackson.databind.ObjectMapper;
-//import com.qtra.scanner.dto.TLSScanResult;
-//import jakarta.annotation.PreDestroy;
+//import com.qtra.scanner.config.KafkaConsumerConfig;
 //import jakarta.annotation.PostConstruct;
-//import org.apache.kafka.clients.consumer.*;
-//import org.springframework.beans.factory.annotation.Value;
-//import org.springframework.scheduling.annotation.Async;
+//import org.apache.kafka.clients.consumer.ConsumerRecord;
+//import org.apache.kafka.clients.consumer.ConsumerRecords;
+//import org.apache.kafka.clients.consumer.KafkaConsumer;
+//import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.stereotype.Service;
 //
 //import java.time.Duration;
 //import java.util.Collections;
-//import java.util.Properties;
+//
+//@Service
+//public class KafkaConsumerService {
+//
+//    private final KafkaConsumer<String, String> kafkaConsumer;
+//    private final String topic;
+//
+//    @Autowired
+//    public KafkaConsumerService(KafkaConsumer<String, String> kafkaConsumer, KafkaConsumerConfig kafkaConsumerConfig) {
+//        this.kafkaConsumer = kafkaConsumer;
+//        this.topic = kafkaConsumerConfig.getTopic();
+//        this.kafkaConsumer.subscribe(Collections.singletonList(topic));
+//    }
+//
+//    @PostConstruct
+//    public void startConsumer() {
+//        new Thread(this::pollMessages, "Kafka-Consumer-Thread").start();
+//    }
+//
+//    private void pollMessages() {
+//        while (true) {
+//            ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(100));
+//            for (ConsumerRecord<String, String> record : records) {
+//                System.out.printf("Consumed message: key=%s value=%s%n", record.key(), record.value());
+//            }
+//        }
+//    }
+//}
 
+
+import com.qtra.scanner.agents.QuantumRiskAnalyzerAgent;
+import com.qtra.scanner.agents.ReportGeneratorAgent;
+import com.qtra.scanner.agents.SSLScannerAgent;
 import com.qtra.scanner.config.KafkaConsumerConfig;
-import jakarta.annotation.PostConstruct;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Collections;
 
-//@Service
-//public class KafkaConsumerService {
-//
-//    private final KafkaConsumer<String, String> consumer;
-//    private final SSLScannerAgent sslScannerAgent; // Instance of SSLScannerAgent for processing scan results
-//    private volatile boolean running = true; // Flag to control the consumer's operation
-//    private static final ObjectMapper objectMapper = new ObjectMapper();
-//
-//    /**
-//     * Constructor for KafkaConsumerService.
-//     *
-//     * @param bootstrapServers Kafka bootstrap servers configuration.
-//     * @param groupId         Consumer group ID for tracking offsets.
-//     * @param topic           Topic to subscribe to for messages.
-//     * @param sslScannerAgent  Instance of SSLScannerAgent for processing scan results.
-//     */
-//    public KafkaConsumerService(
-//            @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
-//            @Value("${spring.kafka.consumer.group-id}") String groupId,
-//            @Value("${spring.kafka.consumer.topic}") String topic,
-//            SSLScannerAgent sslScannerAgent) { // Inject SSLScannerAgent
-//
-//        // Set Kafka consumer properties
-//        Properties props = new Properties();
-//        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-//        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-//        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-//        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-//        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"); // Start reading from the earliest message
-//
-//        // Create the Kafka consumer instance with the specified properties
-//        this.consumer = new KafkaConsumer<>(props);
-//        consumer.subscribe(Collections.singletonList(topic)); // Subscribe to the specified topic
-//        this.sslScannerAgent = sslScannerAgent; // Initialize SSLScannerAgent
-//        System.out.println("KafkaConsumerService initialized. Subscribed to topic: " + topic); // Log initialization
-//    }
-//
-//    /**
-//     * Initialization method called after the service is constructed.
-//     * Starts consuming messages from Kafka.
-//     */
-//    @PostConstruct
-//    public void init() {
-//        System.out.println("Starting to consume messages from Kafka..."); // Log the start of consumption
-//        consumeMessages(); // Start consuming messages after initialization
-//    }
-//
-//    /**
-//     * Asynchronously consumes messages from the Kafka topic.
-//     * Processes each received message using SSLScannerAgent.
-//     */
-//    @Async
-//    public void consumeMessages() {
-//        System.out.println("Kafka message consumption thread started."); // Log thread start
-//        while (running) {
-//            ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-//            records.forEach(record -> {
-//                System.out.println("Received: " + record.value());
-//                TLSScanResult result = convertJsonToResult(record.value());
-//                String analysisResult = sslScannerAgent.analyze(result); // Use the analyze method to get insights
-//                System.out.println("Analysis Result: \n" + analysisResult); // Print the analysis result
-//            });
-//        }
-//    }
-//
-//    public static TLSScanResult convertJsonToResult(String json) {
-//        try {
-//            return objectMapper.readValue(json, TLSScanResult.class);
-//        } catch (Exception e) {
-//            System.err.println("Failed to parse JSON: " + json);
-//            e.printStackTrace();
-//            return new TLSScanResult("UNKNOWN", "UNKNOWN", "UNKNOWN", null);
-//        }
-//    }
-//    /**
-//     * Cleanly shuts down the Kafka consumer when the service is destroyed.
-//     */
-//    @PreDestroy
-//    public void shutdown() {
-//        running = false; // Stop the consumer loop
-//        consumer.wakeup();  // Interrupts poll() to exit cleanly
-//        consumer.close(); // Close the consumer to release resources
-//        System.out.println("Kafka Consumer shut down."); // Log the shutdown
-//    }
-//}
-
 @Service
+@EnableScheduling
 public class KafkaConsumerService {
 
+    private static final Logger logger = LoggerFactory.getLogger(KafkaConsumerService.class);
+
     private final KafkaConsumer<String, String> kafkaConsumer;
+    private final KafkaProducerService kafkaProducerService;
+    private final SSLScannerAgent sslScannerAgent;
+    private final QuantumRiskAnalyzerAgent quantumRiskAnalyzerAgent;
+    private final ReportGeneratorAgent reportGeneratorAgent;
     private final String topic;
 
-    @Autowired
-    public KafkaConsumerService(KafkaConsumer<String, String> kafkaConsumer, KafkaConsumerConfig kafkaConsumerConfig) {
+    public KafkaConsumerService(
+            KafkaConsumer<String, String> kafkaConsumer,
+            KafkaProducerService kafkaProducerService,
+            SSLScannerAgent sslScannerAgent,
+            QuantumRiskAnalyzerAgent quantumRiskAnalyzerAgent,
+            ReportGeneratorAgent reportGeneratorAgent,
+            KafkaConsumerConfig kafkaConsumerConfig) {
+
         this.kafkaConsumer = kafkaConsumer;
+        this.kafkaProducerService = kafkaProducerService;
+        this.sslScannerAgent = sslScannerAgent;
+        this.quantumRiskAnalyzerAgent = quantumRiskAnalyzerAgent;
+        this.reportGeneratorAgent = reportGeneratorAgent;
         this.topic = kafkaConsumerConfig.getTopic();
+
         this.kafkaConsumer.subscribe(Collections.singletonList(topic));
+        logger.info("Subscribed to Kafka topic: {}", topic);
     }
 
-    @PostConstruct
-    public void startConsumer() {
-        new Thread(this::pollMessages, "Kafka-Consumer-Thread").start();
-    }
-
-    private void pollMessages() {
-        while (true) {
+    /**
+     * Polls Kafka messages every second and processes them.
+     */
+    @Scheduled(fixedDelay = 1000) // Runs every 1 second
+    public void pollMessages() {
+        try {
             ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(100));
-            for (ConsumerRecord<String, String> record : records) {
-                System.out.printf("Consumed message: key=%s value=%s%n", record.key(), record.value());
+            if (records.isEmpty()) {
+                return; // No messages to process
             }
+
+            for (ConsumerRecord<String, String> record : records) {
+                processRecord(record);
+            }
+
+            kafkaConsumer.commitSync(); // Commit offsets after processing all messages
+        } catch (Exception e) {
+            logger.error("Error while polling messages from Kafka", e);
+        }
+    }
+
+    /**
+     * Processes a single Kafka message.
+     */
+    private void processRecord(ConsumerRecord<String, String> record) {
+        try {
+            String input = record.value();
+            logger.info("Received message: key={}, value={}", record.key(), input);
+
+            // Execute AI agents in sequence
+            String sslResult = sslScannerAgent.process(input);
+            logger.info("SSL Scan Result for: {}", sslResult);
+
+            String quantumResult = quantumRiskAnalyzerAgent.process(sslResult);
+            logger.info("Quantum Risk Analysis for: {}", quantumResult);
+
+            String report = reportGeneratorAgent.process(quantumResult);
+            logger.info("Generated report for: {}", report);
+
+            // Send final report to Kafka
+            kafkaProducerService.sendMessage("tls-analysis-results", record.key(), report);
+        } catch (Exception e) {
+            logger.error("Error processing Kafka message: key={}, value={}", record.key(), record.value(), e);
         }
     }
 }
-
-

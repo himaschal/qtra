@@ -38,6 +38,8 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "my-group");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, keyDeserializer);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, valueDeserializer);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true"); // Auto-commit offsets
+
         return new KafkaConsumer<>(props);
     }
 
