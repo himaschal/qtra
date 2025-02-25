@@ -1,5 +1,6 @@
 package com.qtra.scanner.controller;
 
+import com.qtra.scanner.service.KafkaConsumerService;
 import com.qtra.scanner.service.KafkaProducerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,3 +22,4 @@ public class KafkaController {
         return "Message sent to Kafka topic!";
     }
 }
+

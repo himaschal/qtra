@@ -51,11 +51,11 @@
 		</dependency>
 
 		<!-- Kafka Test (for unit testing Kafka consumers/producers) -->
-<!--		<dependency>-->
-<!--			<groupId>org.springframework.kafka</groupId>-->
-<!--			<artifactId>spring-kafka-test</artifactId>-->
-<!--			<scope>test</scope>-->
-<!--		</dependency>-->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 
 	</dependencies>
 

@@ -13,9 +13,20 @@ package com.qtra.scanner.service;
 //import java.util.Collections;
 //import java.util.Properties;
 
-//@Service
-public class KafkaConsumerService {
+import com.qtra.scanner.config.KafkaConsumerConfig;
+import jakarta.annotation.PostConstruct;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.util.Collections;
+
+//@Service
+//public class KafkaConsumerService {
+//
 //    private final KafkaConsumer<String, String> consumer;
 //    private final SSLScannerAgent sslScannerAgent; // Instance of SSLScannerAgent for processing scan results
 //    private volatile boolean running = true; // Flag to control the consumer's operation
@@ -97,4 +108,34 @@ public class KafkaConsumerService {
 //        consumer.close(); // Close the consumer to release resources
 //        System.out.println("Kafka Consumer shut down."); // Log the shutdown
 //    }
+//}
+
+@Service
+public class KafkaConsumerService {
+
+    private final KafkaConsumer<String, String> kafkaConsumer;
+    private final String topic;
+
+    @Autowired
+    public KafkaConsumerService(KafkaConsumer<String, String> kafkaConsumer, KafkaConsumerConfig kafkaConsumerConfig) {
+        this.kafkaConsumer = kafkaConsumer;
+        this.topic = kafkaConsumerConfig.getTopic();
+        this.kafkaConsumer.subscribe(Collections.singletonList(topic));
+    }
+
+    @PostConstruct
+    public void startConsumer() {
+        new Thread(this::pollMessages, "Kafka-Consumer-Thread").start();
+    }
+
+    private void pollMessages() {
+        while (true) {
+            ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(100));
+            for (ConsumerRecord<String, String> record : records) {
+                System.out.printf("Consumed message: key=%s value=%s%n", record.key(), record.value());
+            }
+        }
+    }
 }
+
+
