@@ -24,11 +24,11 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
-<!--		<dependency>-->
-<!--			<groupId>org.apache.kafka</groupId>-->
-<!--			<artifactId>kafka-clients</artifactId>-->
-<!--			<version>3.7.0</version>  &lt;!&ndash; Use the latest stable version &ndash;&gt;-->
-<!--		</dependency>-->
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
+			<version>3.7.0</version>  <!-- Use the latest stable version -->
+		</dependency>
 
 		<!-- Lombok (for reducing boilerplate code) -->
 		<dependency>
