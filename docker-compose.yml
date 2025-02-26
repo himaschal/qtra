@@ -39,7 +39,7 @@ services:
       - kafka
     networks:
       - qtra-network
-    
+
   mysql:
     image: mysql:8
     container_name: qtra-mysql
