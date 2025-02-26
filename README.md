@@ -1,151 +1,106 @@
-# QTRA Application
+# Quantum Threat Risk Assessment (QTRA)
 
 ## Overview
-
-The Quantum Threat Risk Assessment (QTRA) application scans websites for TLS vulnerabilities and assesses their quantum risk using AI agents. It utilizes Kafka for messaging between components.
+The Quantum Threat Risk Assessment (QTRA) project evaluates a domain’s TLS security posture and its readiness for post-quantum cryptography (PQC). It automates TLS scanning, risk analysis, and reporting, using a chained AI agent architecture to classify quantum safety and generate a Quantum Readiness Score.
 
 ## Features
-- **TLS Scanning**: Analyzes a given domain’s TLS configuration.
-- **Quantum Risk Assessment**: Determines if the TLS setup is safe against quantum threats.
-- **AI Agents**: Automate the risk evaluation and reporting.
-- **Kafka Integration**: Uses Kafka for processing and real-time data streaming.
-- **Kafka UI**: Provides an intuitive interface to monitor Kafka messages.
-- **Swagger UI**: Interactive API documentation.
+- Automated TLS Scanning – Checks TLS version, cipher suites, and security features like HSTS & DNSSEC.
+- AI-Driven Quantum Risk Analysis – Classifies encryption strength and assigns a readiness score.
+- Kafka-Driven Event Processing – Uses Spring Boot + Kafka for scalability and real-time processing.
+- AI-Powered Reporting – Produces a structured security report for monitoring and integration.
+- Chained AI Agent Architecture – Ensures modular and extensible analysis flow.
 
----
+## Tech Stack
+- Spring Boot (Backend Framework)
+- Kafka (Event-Driven Processing)
+- Docker & Kafka UI (Monitoring)
+- Swagger UI (API Testing)
+- Jackson (JSON Processing)
+- Lombok (Code Simplification)
 
-## Prerequisites
+## AI Agents & Processing Flow
+QTRA is designed as a chained AI agent system, where each agent specializes in a specific task:
 
-Make sure you have the following installed on your machine:
+### 1. TLS Scanner Agent (SSLScannerAgent)
+- Scans the provided domain and subdomains for:
+   - TLS version
+   - Cipher suite
+   - HSTS & DNSSEC security features
+- Publishes raw results to Kafka (`tls-scan-results` topic).
 
-- Docker
-- Docker Compose
+### 2. Quantum Risk Analyzer Agent (QuantumRiskAnalyzerAgent)
+- Consumes TLS scan results from Kafka.
+- Classifies the quantum safety level of the encryption.
+- Computes a Quantum Readiness Score, considering:
+   - Cipher strength
+   - TLS version
+   - Post-quantum cryptographic support
+   - HSTS and DNSSEC security checks
+- Publishes enriched results to Kafka (`tls-analysis-results` topic).
 
----
+### 3. Report Generator Agent (ReportGeneratorAgent)
+- Consumes quantum readiness results from Kafka.
+- Generates a structured Quantum Readiness Report.
+- Designed for future integration with dashboards or databases.
 
-## Running the Application
+## Running the Project
 
-1. **Clone the repository** (if you haven't already):
-
-   ```bash
-   git clone <repository-url>
-   cd <repository-directory>
-
-2. **Build and start the Docker containers using Docker Compose:**
-
-   ```bash
-   docker-compose up -d --build
-   ```
-
-This starts:
-
-- Zookeeper
-- Kafka
-- Spring Boot QTRA application
-- Kafka UI (available at http://localhost:8081)
-- Swagger UI (available at http://localhost:8080/swagger-ui.html)
-
-**Testing the TLS Scan Endpoint**
-
-Send a request to the TLS scan endpoint using curl (or use the provide Swagger UI). 
-
-Replace https://example.com with the URL you want to scan:
-```bash
-curl -X GET "http://localhost:8080/tls/scan?domain=example.com"
-
+### 1. Clone the Repository
+```sh
+git clone https://github.com/himaschal/qtra.git
+cd qtra
 ```
 
-You should receive a response containing the TLS scan results.
-
-```json
-{"domain":"example.com","protocol":"TLSv1.3","cipherSuite":"TLS_AES_256_GCM_SHA384","safetyLevel":"PQR_BUT_NOT_QUANTUM_SAFE"}
+### 2. Build the package and run the Application with Docker Compose
+```sh
+mvn clean package
+docker compose -d --build
 ```
 
-Invoke via SwaggerUI
+This will start:
 
-![img_3.png](img_3.png)
+- The QTRA application
+- Kafka and Zookeeper for event-driven processing
+- Kafka UI for monitoring
 
-**Verifying Message Publication and Consumption**
+### 3. Access Kafka UI
+Kafka UI will be available at:
+http://localhost:8080/
 
-To verify that messages are being published and consumed as expected, follow these steps:
+## Submitting a TLS Scan
 
-*Check Kafka Topics*
+### 1. Access Swagger UI
+   http://localhost:8081/swagger-ui.html
 
-Open Kafka UI in your browser: http://localhost:8081
+### 2. Submit a Scan Request
+   - Open Swagger UI
+   - Go to `GET /tls/scan`
+   - Enter a domain (e.g., `aws.com`)
+   - Click `Execute`
 
-Navigate to the Topics section to view the available topics:
+## Monitoring Messages in Kafka UI
 
- - tls-scan-results: Contains the results of the TLS scans.
- - tls-analysis-results: Contains the final analysis reports.
- - Click on a topic to view messages. You can also consume messages from each topic and see the details of each message in a user-friendly format.
+### 1. View TLS Scan Results (tls-scan-results topic)
+   - Open Kafka UI at http://localhost:8080/
+   - Navigate to "Topics" → `tls-scan-results`
+   - Click "Messages" to view the raw scan results.
 
-Topics
-![img.png](img.png)
+### 2. View Quantum Readiness Analysis (tls-analysis-results topic)
+   - In Kafka UI, go to "Topics" → `tls-analysis-results`
+   - Click "Messages" to see the Quantum Readiness Score and analysis details.
 
-tls-scan-results: Contains the results of the TLS scans.
-![img_1.png](img_1.png)
+## Stopping the Application
+To stop all running services, use:
 
-tls-analysis-results: Contains the final analysis reports.
-![img_2.png](img_2.png)
-
-Alternatively, list all Kafka topics directly from your host machine:
-
-```bash
-docker exec -it qtra-kafka kafka-topics --bootstrap-server localhost:9092 --list
-__consumer_offsets
-tls-analysis-results
-tls-scan-results
-```
-
-Replace <kafka-container-name> with the name of your Kafka container (usually something like kafka or qtra-kafka).
-
-Describe the tls-scan-results topic to see the configuration:
-
-```bash
-docker exec -it qtra-kafka kafka-topics --bootstrap-server localhost:9092 --describe --topic tls-scan-results
-
-Topic: tls-scan-results	TopicId: 0gJiI7ohQjCf1hnfoxSGKw	PartitionCount: 1	ReplicationFactor: 1	Configs:
-	Topic: tls-scan-results	Partition: 0	Leader: 1	Replicas: 1	Isr: 1	Elr: N/A	LastKnownElr: N/A
-```
-
-Describe the tls-analysis-results topic similarly:
-```bash
-docker exec -it qtra-kafka kafka-topics --bootstrap-server localhost:9092 --describe --topic tls-analysis-results
-Topic: tls-analysis-results	TopicId: y5b6nJHQRrydQktL1gKL1w	PartitionCount: 1	ReplicationFactor: 1	Configs:
-	Topic: tls-analysis-results	Partition: 0	Leader: 1	Replicas: 1	Isr: 1	Elr: N/A	LastKnownElr: N
-```
-
-View Published Messages
-
-Use the Kafka console consumer to read messages from the tls-scan-results topic directly:
-```bash
-docker exec -it qtra-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic tls-scan-results --from-beginning
-
-{"domain":"example.com","protocol":"TLSv1.3","cipherSuite":"TLS_AES_256_GCM_SHA384","safetyLevel":"PQR_BUT_NOT_QUANTUM_SAFE"}
-^CProcessed a total of 1 messages
-```
-
-In another terminal, view messages from the tls-analysis-results topic:
-
-```bash
-docker exec -it qtra-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic tls-analysis-results --from-beginning
-
-Generated report for: TLS configuration for {"domain":"example.com","protocol":"TLSv1.3","cipherSuite":"TLS_AES_256_GCM_SHA384","safetyLevel":"PQR_BUT_NOT_QUANTUM_SAFE"} is **Not Quantum-Safe** ❌
-^CProcessed a total of 1 messages
-
-```
-
-## Stopping the Application ##
-
-To stop the application and remove the containers, you can run:
-
-```bash
+```sh
 docker-compose down
 ```
 
-## Troubleshooting ##
+## Future Enhancements ##
+- Improve AI Agents – Enhance risk scoring using real-time threat intelligence.
+- Database Integration – Store historical TLS scans for tracking trends.
+- Security Dashboard – Visualize readiness scores in Grafana.
+- Extend API Exposure – Allow external integrations for real-time security assessments.
 
-If you encounter issues with Kafka topics or message consumption, ensure that your Docker containers are running properly and that there are no errors in the application logs.
-Check the Kafka logs for any warnings or errors related to message production or consumption.
-Contributing
-If you would like to contribute to this project, please open an issue or submit a pull request.
+## Troubleshooting ##
+- Ensure that the container ports are available
