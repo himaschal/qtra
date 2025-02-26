@@ -1,6 +1,5 @@
 package com.qtra.scanner.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.dto.TLSScanResult;
 import com.qtra.scanner.service.KafkaProducerService;
@@ -14,6 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
 @RestController
 @RequestMapping("/tls")
 @Tag(name = "TLS Scanner API", description = "Endpoints for TLS scanning and security analysis")
@@ -22,30 +24,20 @@ public class TLSScannerController {
 
     private final TLSScanner tlsScanner;
     private final KafkaProducerService kafkaProducerService;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/scan")
-    @Operation(summary = "Scan a domain for TLS security", description = "Performs a TLS handshake and returns encryption details.")
-    public ResponseEntity<TLSScanResult> scanDomain(@RequestParam String domain) {
-        TLSScanResult result = tlsScanner.scan(domain);
-
-        // Convert result to JSON (or any suitable format) for sending to Kafka
-        String message = convertResultToJson(result);
-
-        // Send scan result to Kafka
-        kafkaProducerService.sendMessage("tls-scan-results", domain, message);
-
-        return ResponseEntity.ok(result);
-    }
-
-    private String convertResultToJson(TLSScanResult result) {
-        // Use your preferred method to convert the result to a JSON string
-        // Example using ObjectMapper (you may need to import com.fasterxml.jackson.databind.ObjectMapper)
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            return objectMapper.writeValueAsString(result);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            return "{}"; // return an empty JSON object in case of error
-        }
+    @Operation(summary = "Scan a domain and subdomains for TLS security")
+    public CompletableFuture<ResponseEntity<List<TLSScanResult>>> scanDomain(@RequestParam String domain) {
+        return tlsScanner.scanWithSubdomains(domain).thenApply(results -> {
+            try {
+                String jsonResult = objectMapper.writeValueAsString(results);
+                kafkaProducerService.sendMessage("tls-scan-results", domain, jsonResult);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return ResponseEntity.ok(results);
+        });
     }
 }
+

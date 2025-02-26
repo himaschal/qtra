@@ -1,9 +1,11 @@
 package com.qtra.scanner.agents;
 
 import com.qtra.scanner.dto.TLSScanResult;
-import com.qtra.scanner.enums.QuantumSafetyLevel;
 import com.qtra.scanner.service.TLSScanner;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class SSLScannerAgent {
@@ -14,18 +16,10 @@ public class SSLScannerAgent {
         this.tlsScanner = tlsScanner;
     }
 
-    public TLSScanResult process(String urlString) {
-        try {
-            // Extract domain from URL (remove https:// if present)
-            String domain = urlString.replaceFirst("^(https?://)", "").split("/")[0];
-
-            // Perform TLS scan
-            return tlsScanner.scan(domain);
-
-        } catch (Exception e) {
-            return null;
-        }
+    public CompletableFuture<List<TLSScanResult>> process(String domain) {
+        return tlsScanner.scanWithSubdomains(domain);
     }
+}
 
 //    public String analyze(TLSScanResult result) {
 //        System.out.println("Analyzing TLSScanResult for domain: " + result.getDomain());
@@ -61,6 +55,3 @@ public class SSLScannerAgent {
 //
 //        return analysis.toString();
 //    }
-
-
-}

@@ -3,10 +3,11 @@ package com.qtra.scanner.service;
 import com.qtra.scanner.enums.QuantumSafetyLevel;
 import com.qtra.scanner.dto.TLSScanResult;
 import org.springframework.stereotype.Service;
-
 import javax.net.ssl.*;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class TLSScanner {
@@ -21,6 +22,30 @@ public class TLSScanner {
             "TLS_AES_256_GCM_SHA384",
             "TLS_CHACHA20_POLY1305_SHA256"
     );
+
+    private static final List<String> COMMON_SUBDOMAINS = List.of("www", "api", "mail", "blog", "shop");
+
+    public CompletableFuture<List<TLSScanResult>> scanWithSubdomains(String domain) {
+        List<CompletableFuture<TLSScanResult>> futures = new ArrayList<>();
+
+        // Scan the main domain
+        futures.add(CompletableFuture.supplyAsync(() -> scan(domain)));
+
+        // Scan common subdomains asynchronously
+        for (String subdomain : COMMON_SUBDOMAINS) {
+            String subdomainToScan = subdomain + "." + domain;
+            futures.add(CompletableFuture.supplyAsync(() -> scan(subdomainToScan)));
+        }
+
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> {
+                    List<TLSScanResult> results = new ArrayList<>();
+                    for (CompletableFuture<TLSScanResult> future : futures) {
+                        results.add(future.join());
+                    }
+                    return results;
+                });
+    }
 
     public TLSScanResult scan(String domain) {
         try {
@@ -51,12 +76,9 @@ public class TLSScanner {
     private SSLSocket createSSLSocket(String domain, int port) throws IOException {
         SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         SSLSocket socket = (SSLSocket) factory.createSocket(domain, port);
-
-        // Enable all available TLS protocols
         socket.setEnabledProtocols(socket.getSupportedProtocols());
-
-        // Start handshake to trigger cipher selection
         socket.startHandshake();
         return socket;
     }
 }
+

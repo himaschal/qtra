@@ -1,52 +1,45 @@
 package com.qtra.scanner.service;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import org.apache.kafka.clients.producer.*;
-import org.apache.kafka.common.serialization.StringSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.common.utils.LogContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.apache.kafka.clients.producer.*;
 
 import java.util.Properties;
 
 @Service
 public class KafkaProducerService {
 
-    private KafkaProducer<String, String> producer;
+    private final KafkaProducer<String, String> producer;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(KafkaProducerService.class);
 
-    @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers;
-
-    @PostConstruct
-    public void init() {
-        // Initialize the Kafka producer
-        producer = new KafkaProducer<>(createProducerConfig());
-    }
-
-    private Properties createProducerConfig() {
+    public KafkaProducerService(@Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());  // Ensure correct key serialization
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        return props;
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+
+        this.producer = new KafkaProducer<>(props);
     }
 
-    public void sendMessage(String topic, String key, String value) {
-        System.out.println("Kafka producer sendMessage");
-        producer.send(new ProducerRecord<>(topic, key, value), (metadata, exception) -> {
-            if (exception == null) {
-                System.out.println("Message sent to topic " + topic + " at offset " + metadata.offset());
-            } else {
-                exception.printStackTrace();
-            }
-        });
-        producer.flush(); // Ensure all messages are sent before proceeding
-    }
+    public void sendMessage(String topic, String key, Object value) {
+        try {
+            // Ensure JSON is serialized only once
+            String json = (value instanceof String) ? (String) value : objectMapper.writeValueAsString(value);
 
-    @PreDestroy
-    public void cleanup() {
-        if (producer != null) {
-            producer.close();
+            producer.send(new ProducerRecord<>(topic, key, json), (metadata, exception) -> {
+                if (exception != null) {
+                    logger.error("Failed to send message to topic {}: {}", topic, exception.getMessage(), exception);
+                } else {
+                    logger.info("Successfully sent message to {} with key {}", topic, key);
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Exception while sending Kafka message: ", e);
         }
     }
 }
