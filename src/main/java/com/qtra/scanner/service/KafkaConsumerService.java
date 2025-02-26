@@ -79,26 +79,18 @@ public class KafkaConsumerService {
     private void processRecord(ConsumerRecord<String, String> record) {
         try {
             String json = record.value();
-            logger.info("Received message: key={}, value={}", record.key(), json);
-
-            // Deserialize JSON into a list of TLSScanResults
             List<TLSScanResult> scanResults = objectMapper.readValue(json, new TypeReference<>() {});
 
             for (TLSScanResult scanResult : scanResults) {
-                // Analyze quantum risk
-                String quantumAnalysis = quantumRiskAnalyzerAgent.process(scanResult);
-                logger.info("Quantum Analysis Result: {}", quantumAnalysis);
+                // Assign QuantumSafetyLevel
+                TLSScanResult enrichedResult = quantumRiskAnalyzerAgent.process(scanResult);
 
-                // Generate report
-                String report = reportGeneratorAgent.process(quantumAnalysis);
-                logger.info("Generated Report: {}", report);
-
-                // Send report to Kafka topic "tls-analysis-results"
-                kafkaProducerService.sendMessage("tls-analysis-results", scanResult.getDomain(), report);
+                // Publish enriched result
+                kafkaProducerService.sendMessage("tls-analysis-results", scanResult.getDomain(), objectMapper.writeValueAsString(enrichedResult));
             }
 
         } catch (Exception e) {
-            logger.error("Error processing Kafka message: key={}, value={}", record.key(), record.value(), e);
+            logger.error("Error processing Kafka message: ", e);
         }
     }
 }

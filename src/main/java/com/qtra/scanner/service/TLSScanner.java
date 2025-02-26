@@ -54,22 +54,11 @@ public class TLSScanner {
 
             String protocol = session.getProtocol();
             String cipherSuite = session.getCipherSuite();
-            QuantumSafetyLevel safetyLevel = classifyCipher(cipherSuite);
 
             sslSocket.close();
-            return new TLSScanResult(domain, protocol, cipherSuite, safetyLevel);
+            return new TLSScanResult(domain, protocol, cipherSuite, null); // No quantum classification
         } catch (Exception e) {
-            return new TLSScanResult(domain, "UNKNOWN", "UNKNOWN", QuantumSafetyLevel.NOT_QUANTUM_SAFE);
-        }
-    }
-
-    private QuantumSafetyLevel classifyCipher(String cipherSuite) {
-        if (TRULY_QUANTUM_SAFE_CIPHERS.contains(cipherSuite)) {
-            return QuantumSafetyLevel.TRULY_QUANTUM_SAFE;
-        } else if (PQR_BUT_NOT_QUANTUM_SAFE_CIPHERS.contains(cipherSuite)) {
-            return QuantumSafetyLevel.PQR_BUT_NOT_QUANTUM_SAFE;
-        } else {
-            return QuantumSafetyLevel.NOT_QUANTUM_SAFE;
+            return new TLSScanResult(domain, "UNKNOWN", "UNKNOWN", null);
         }
     }
 
