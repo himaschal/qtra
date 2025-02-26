@@ -35,7 +35,7 @@ public class KafkaProducerService {
                 if (exception != null) {
                     logger.error("Failed to send message to topic {}: {}", topic, exception.getMessage(), exception);
                 } else {
-                    logger.info("Successfully sent message to {} with key {}", topic, key);
+                    logger.info("Successfully sent message to {} with key {} and json {}", topic, key, json);
                 }
             });
         } catch (Exception e) {

@@ -7,6 +7,8 @@ import com.qtra.scanner.service.TLSScanner;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +23,8 @@ import java.util.concurrent.CompletableFuture;
 @Tag(name = "TLS Scanner API", description = "Endpoints for TLS scanning and security analysis")
 @RequiredArgsConstructor
 public class TLSScannerController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TLSScannerController.class);
 
     private final TLSScanner tlsScanner;
     private final KafkaProducerService kafkaProducerService;
@@ -38,6 +42,15 @@ public class TLSScannerController {
             }
             return ResponseEntity.ok(results);
         });
+    }
+
+    public String scan(@RequestParam String domain) {
+        logger.info("📢 Received request to scan domain: {}", domain);
+
+        // ✅ Call scanAndPublish to perform TLS scanning and send results to Kafka
+        tlsScanner.scanAndPublish(domain);
+
+        return "TLS scan started for " + domain;
     }
 }
 

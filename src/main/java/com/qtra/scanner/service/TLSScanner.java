@@ -1,10 +1,14 @@
 package com.qtra.scanner.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.enums.QuantumSafetyLevel;
 import com.qtra.scanner.dto.TLSScanResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import javax.net.ssl.*;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -12,29 +16,42 @@ import java.util.concurrent.CompletableFuture;
 @Service
 public class TLSScanner {
 
-    private static final List<String> TRULY_QUANTUM_SAFE_CIPHERS = List.of(
-            "TLS_KYBER768_WITH_AES_128_GCM_SHA256",
-            "TLS_KYBER1024_WITH_AES_256_GCM_SHA384"
-    );
+    private static final Logger logger = LoggerFactory.getLogger(TLSScanner.class);
+    private final KafkaProducerService kafkaProducerService;
+    private final ObjectMapper objectMapper;
 
-    private static final List<String> PQR_BUT_NOT_QUANTUM_SAFE_CIPHERS = List.of(
-            "TLS_AES_128_GCM_SHA256",
-            "TLS_AES_256_GCM_SHA384",
-            "TLS_CHACHA20_POLY1305_SHA256"
-    );
+    public TLSScanner(KafkaProducerService kafkaProducerService) {
+        this.kafkaProducerService = kafkaProducerService;
+        this.objectMapper = new ObjectMapper();
+    }
 
-    private static final List<String> COMMON_SUBDOMAINS = List.of("www", "api", "mail", "blog", "shop");
+    /**
+     * Scans a domain and its subdomains asynchronously, then publishes results to Kafka.
+     * @param domain The primary domain to scan.
+     */
+    public void scanAndPublish(String domain) {
+        CompletableFuture<List<TLSScanResult>> futureResults = scanWithSubdomains(domain);
+        futureResults.thenAccept(results -> {
+            try {
+                String jsonResults = objectMapper.writeValueAsString(results);
+                kafkaProducerService.sendMessage("tls-scan-results", domain, jsonResults);
+            } catch (Exception e) {
+                logger.error("Error publishing TLS scan results: ", e);
+            }
+        });
+    }
 
+    /**
+     * Scans a domain and its subdomains asynchronously.
+     * @param domain The primary domain.
+     * @return A CompletableFuture containing the list of TLS scan results.
+     */
     public CompletableFuture<List<TLSScanResult>> scanWithSubdomains(String domain) {
         List<CompletableFuture<TLSScanResult>> futures = new ArrayList<>();
+        List<String> subdomains = discoverSubdomains(domain);
 
-        // Scan the main domain
-        futures.add(CompletableFuture.supplyAsync(() -> scan(domain)));
-
-        // Scan common subdomains asynchronously
-        for (String subdomain : COMMON_SUBDOMAINS) {
-            String subdomainToScan = subdomain + "." + domain;
-            futures.add(CompletableFuture.supplyAsync(() -> scan(subdomainToScan)));
+        for (String subdomain : subdomains) {
+            futures.add(CompletableFuture.supplyAsync(() -> scan(subdomain)));
         }
 
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -47,27 +64,77 @@ public class TLSScanner {
                 });
     }
 
-    public TLSScanResult scan(String domain) {
+    /**
+     * Performs a TLS scan on a single domain.
+     * @param domain The domain to scan.
+     * @return A TLSScanResult containing the protocol and cipher suite.
+     */
+    private TLSScanResult scan(String domain) {
         try {
             SSLSocket sslSocket = createSSLSocket(domain, 443);
             SSLSession session = sslSocket.getSession();
 
             String protocol = session.getProtocol();
             String cipherSuite = session.getCipherSuite();
-
             sslSocket.close();
-            return new TLSScanResult(domain, protocol, cipherSuite, null); // No quantum classification
+
+            logger.info("✅ Scanned {}: Protocol={}, Cipher={}", domain, protocol, cipherSuite);
+            return new TLSScanResult(domain, protocol, cipherSuite);
         } catch (Exception e) {
-            return new TLSScanResult(domain, "UNKNOWN", "UNKNOWN", null);
+            logger.warn("⚠️ Failed to scan TLS for {}: {}", domain, e.getMessage());
+            return new TLSScanResult(domain, "UNKNOWN", "UNKNOWN");
         }
     }
 
-    private SSLSocket createSSLSocket(String domain, int port) throws IOException {
+    /**
+     * Creates an SSLSocket to establish a TLS connection and retrieve SSL details.
+     * @param domain The domain to scan.
+     * @param port The port to connect to (usually 443).
+     * @return An SSLSocket with an active TLS session.
+     * @throws Exception If the connection fails.
+     */
+    private SSLSocket createSSLSocket(String domain, int port) throws Exception {
         SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         SSLSocket socket = (SSLSocket) factory.createSocket(domain, port);
         socket.setEnabledProtocols(socket.getSupportedProtocols());
         socket.startHandshake();
         return socket;
+    }
+
+    /**
+     * Discovers common subdomains for a given domain.
+     * @param domain The root domain.
+     * @return A list of subdomains to scan.
+     */
+    private List<String> discoverSubdomains(String domain) {
+        List<String> subdomains = new ArrayList<>();
+        String[] commonSubdomains = {"www", "api", "mail", "blog", "shop"};
+
+        for (String sub : commonSubdomains) {
+            String fullDomain = sub + "." + domain;
+            if (isDomainActive(fullDomain)) {
+                subdomains.add(fullDomain);
+            }
+        }
+
+        // Always scan the root domain
+        subdomains.add(domain);
+        logger.info("🔍 Discovered subdomains for {}: {}", domain, subdomains);
+        return subdomains;
+    }
+
+    /**
+     * Checks if a domain is active by resolving its DNS.
+     * @param domain The domain to check.
+     * @return True if the domain resolves, false otherwise.
+     */
+    private boolean isDomainActive(String domain) {
+        try {
+            InetAddress.getByName(domain);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
 

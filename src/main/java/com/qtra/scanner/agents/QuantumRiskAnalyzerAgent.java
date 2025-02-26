@@ -3,6 +3,9 @@ package com.qtra.scanner.agents;
 import com.qtra.scanner.dto.QuantumReadinessResult;
 import com.qtra.scanner.dto.TLSScanResult;
 import com.qtra.scanner.enums.QuantumSafetyLevel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.xbill.DNS.Lookup;
 
@@ -16,6 +19,7 @@ import org.xbill.DNS.Record;
 
 @Service
 public class QuantumRiskAnalyzerAgent {
+    private static final Logger logger = LoggerFactory.getLogger(QuantumRiskAnalyzerAgent.class);
 
     private static final List<String> TRULY_QUANTUM_SAFE_CIPHERS = List.of(
             "TLS_KYBER768_WITH_AES_128_GCM_SHA256",
@@ -30,7 +34,6 @@ public class QuantumRiskAnalyzerAgent {
 
     public QuantumReadinessResult analyze(TLSScanResult scanResult) {
         QuantumSafetyLevel safetyLevel = classifyCipher(scanResult.getCipherSuite());
-
         boolean hstsEnabled = checkHSTS(scanResult.getDomain());
         boolean dnssecEnabled = checkDNSSEC(scanResult.getDomain());
 
@@ -39,9 +42,14 @@ public class QuantumRiskAnalyzerAgent {
         double pqcCertificateScore = calculatePQCCertificateScore(scanResult.getDomain());
         double hstsScore = hstsEnabled ? 10.0 : 0.0;
         double dnssecScore = dnssecEnabled ? 10.0 : 0.0;
+        double totalScore = cipherStrengthScore + tlsVersionScore + pqcCertificateScore + hstsScore + dnssecScore;
+
+
+        logger.info("🔍 Analyzed {}: SafetyLevel={}, Cipher={}, TLS={}, PQC={}, HSTS={}, DNSSEC={}, Total={}",
+                scanResult.getDomain(), safetyLevel, cipherStrengthScore, tlsVersionScore, pqcCertificateScore, hstsScore, dnssecScore, totalScore);
 
         return new QuantumReadinessResult(scanResult.getDomain(), safetyLevel, cipherStrengthScore,
-                tlsVersionScore, pqcCertificateScore, hstsScore, dnssecScore);
+                tlsVersionScore, pqcCertificateScore, hstsScore, dnssecScore, totalScore);
     }
 
     private QuantumSafetyLevel classifyCipher(String cipherSuite) {

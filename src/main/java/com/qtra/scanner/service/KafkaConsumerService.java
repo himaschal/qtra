@@ -3,15 +3,12 @@ package com.qtra.scanner.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.agents.QuantumRiskAnalyzerAgent;
-import com.qtra.scanner.agents.ReportGeneratorAgent;
 import com.qtra.scanner.config.KafkaConsumerConfig;
 import com.qtra.scanner.dto.QuantumReadinessResult;
 import com.qtra.scanner.dto.TLSScanResult;
-import com.qtra.scanner.service.KafkaProducerService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.protocol.types.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,7 +26,6 @@ public class KafkaConsumerService {
     private final KafkaConsumer<String, String> kafkaConsumer;
     private final KafkaProducerService kafkaProducerService;
     private final QuantumRiskAnalyzerAgent quantumRiskAnalyzerAgent;
-    private final ReportGeneratorAgent reportGeneratorAgent;
     private final ObjectMapper objectMapper;
     private String topic;
 
@@ -37,14 +33,12 @@ public class KafkaConsumerService {
             KafkaConsumer<String, String> kafkaConsumer,
             KafkaProducerService kafkaProducerService,
             QuantumRiskAnalyzerAgent quantumRiskAnalyzerAgent,
-            ReportGeneratorAgent reportGeneratorAgent,
             ObjectMapper objectMapper,
             KafkaConsumerConfig kafkaConsumerConfig) {
 
         this.kafkaConsumer = kafkaConsumer;
         this.kafkaProducerService = kafkaProducerService;
         this.quantumRiskAnalyzerAgent = quantumRiskAnalyzerAgent;
-        this.reportGeneratorAgent = reportGeneratorAgent;
         this.objectMapper = objectMapper;
         this.topic = kafkaConsumerConfig.getTopic();
 
@@ -62,12 +56,12 @@ public class KafkaConsumerService {
         ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(100));
 
         if (records.isEmpty()) {
-            logger.info("No messages found in tls-scan-results");
+            logger.info("No messages found");
             return;
         }
 
         for (ConsumerRecord<String, String> record : records) {
-            logger.info("Processing message from tls-scan-results: key={}, value={}", record.key(), record.value());
+            logger.info("Processing message from topic={}, key={}, value={}", record.topic(), record.key(), record.value());
             processRecord(record);
         }
 
@@ -79,6 +73,7 @@ public class KafkaConsumerService {
      */
     private void processRecord(ConsumerRecord<String, String> record) {
         try {
+            logger.info("processRecord: {}", record);
             String json = record.value();
             List<TLSScanResult> scanResults = objectMapper.readValue(json, new TypeReference<>() {});
 
@@ -86,14 +81,7 @@ public class KafkaConsumerService {
 
                 // Generate structured readiness result
                 QuantumReadinessResult readinessResult = quantumRiskAnalyzerAgent.analyze(scanResult);
-
-                // Generate Report
-                reportGeneratorAgent.generateReport(readinessResult);
-
-                // Publish result to Kafka topic for further processing
-                kafkaProducerService.sendMessage("quantum-readiness-reports", scanResult.getDomain(), objectMapper.writeValueAsString(readinessResult));
-
-                // Publish structured readiness result incase another consume wants to use
+                logger.info("readinessResult: {}", readinessResult);
                 kafkaProducerService.sendMessage("tls-analysis-results", scanResult.getDomain(), objectMapper.writeValueAsString(readinessResult));
             }
 
