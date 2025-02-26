@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.dto.TLSScanResult;
 import com.qtra.scanner.service.KafkaProducerService;
 import com.qtra.scanner.service.TLSScanner;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/tls")
+@Tag(name = "TLS Scanner API", description = "Endpoints for TLS scanning and security analysis")
 @RequiredArgsConstructor
 public class TLSScannerController {
 
@@ -21,6 +24,7 @@ public class TLSScannerController {
     private final KafkaProducerService kafkaProducerService;
 
     @GetMapping("/scan")
+    @Operation(summary = "Scan a domain for TLS security", description = "Performs a TLS handshake and returns encryption details.")
     public ResponseEntity<TLSScanResult> scanDomain(@RequestParam String domain) {
         TLSScanResult result = tlsScanner.scan(domain);
 

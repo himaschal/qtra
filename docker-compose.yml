@@ -27,6 +27,19 @@ services:
     networks:
       - qtra-network
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: qtra-kafka-ui
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - qtra-network
+    
   mysql:
     image: mysql:8
     container_name: qtra-mysql
