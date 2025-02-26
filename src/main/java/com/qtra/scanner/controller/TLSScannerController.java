@@ -18,17 +18,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class TLSScannerController {
 
     private final TLSScanner tlsScanner;
-    //private final KafkaProducerService kafkaProducerService;
+    private final KafkaProducerService kafkaProducerService;
 
     @GetMapping("/scan")
     public ResponseEntity<TLSScanResult> scanDomain(@RequestParam String domain) {
         TLSScanResult result = tlsScanner.scan(domain);
 
         // Convert result to JSON (or any suitable format) for sending to Kafka
-        //String message = convertResultToJson(result);
+        String message = convertResultToJson(result);
 
         // Send scan result to Kafka
-        //kafkaProducerService.sendMessage("tls-scan-results", domain, message);
+        kafkaProducerService.sendMessage("tls-scan-results", domain, message);
 
         return ResponseEntity.ok(result);
     }

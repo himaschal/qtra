@@ -44,6 +44,7 @@ import com.qtra.scanner.agents.QuantumRiskAnalyzerAgent;
 import com.qtra.scanner.agents.ReportGeneratorAgent;
 import com.qtra.scanner.agents.SSLScannerAgent;
 import com.qtra.scanner.config.KafkaConsumerConfig;
+import com.qtra.scanner.dto.TLSScanResult;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -118,15 +119,14 @@ public class KafkaConsumerService {
             String input = record.value();
             logger.info("Received message: key={}, value={}", record.key(), input);
 
-            // Execute AI agents in sequence
-            String sslResult = sslScannerAgent.process(input);
-            logger.info("SSL Scan Result for: {}", sslResult);
+            // Call SSLScannerAgent to get the TLSScanResult
+            TLSScanResult scanResult = sslScannerAgent.process(input);
 
-            String quantumResult = quantumRiskAnalyzerAgent.process(sslResult);
-            logger.info("Quantum Risk Analysis for: {}", quantumResult);
+            // Pass the TLSScanResult to QuantumRiskAnalyzerAgent for analysis
+            String quantumResult = quantumRiskAnalyzerAgent.process(scanResult);
 
+            // Generate report with the results
             String report = reportGeneratorAgent.process(quantumResult);
-            logger.info("Generated report for: {}", report);
 
             // Send final report to Kafka
             kafkaProducerService.sendMessage("tls-analysis-results", record.key(), report);

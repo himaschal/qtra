@@ -6,7 +6,7 @@ import com.qtra.scanner.service.TLSScanner;
 import org.springframework.stereotype.Service;
 
 @Service
-public class SSLScannerAgent implements AiAgent {
+public class SSLScannerAgent {
 
     private final TLSScanner tlsScanner;
 
@@ -14,21 +14,16 @@ public class SSLScannerAgent implements AiAgent {
         this.tlsScanner = tlsScanner;
     }
 
-    @Override
-    public String process(String urlString) {
+    public TLSScanResult process(String urlString) {
         try {
             // Extract domain from URL (remove https:// if present)
             String domain = urlString.replaceFirst("^(https?://)", "").split("/")[0];
 
             // Perform TLS scan
-            TLSScanResult result = tlsScanner.scan(domain);
+            return tlsScanner.scan(domain);
 
-            return String.format(
-                    "SSL Scan Result for %s:\nTLS Protocol: %s\nCipher Suite: %s\nQuantum Safety Level: %s",
-                    domain, result.getProtocol(), result.getCipherSuite(), result.getSafetyLevel()
-            );
         } catch (Exception e) {
-            return "SSL Scan failed for " + urlString + ": " + e.getMessage();
+            return null;
         }
     }
 
