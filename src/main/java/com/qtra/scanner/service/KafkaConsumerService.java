@@ -83,14 +83,17 @@ public class KafkaConsumerService {
             List<TLSScanResult> scanResults = objectMapper.readValue(json, new TypeReference<>() {});
 
             for (TLSScanResult scanResult : scanResults) {
-                // Check security features
-                boolean hstsEnabled = quantumRiskAnalyzerAgent.checkHSTS(scanResult.getDomain());
-                boolean dnssecEnabled = quantumRiskAnalyzerAgent.checkDNSSEC(scanResult.getDomain());
 
                 // Generate structured readiness result
-                QuantumReadinessResult readinessResult = quantumRiskAnalyzerAgent.analyze(scanResult, hstsEnabled, dnssecEnabled);
+                QuantumReadinessResult readinessResult = quantumRiskAnalyzerAgent.analyze(scanResult);
 
-                // Publish structured readiness result
+                // Generate Report
+                reportGeneratorAgent.generateReport(readinessResult);
+
+                // Publish result to Kafka topic for further processing
+                kafkaProducerService.sendMessage("quantum-readiness-reports", scanResult.getDomain(), objectMapper.writeValueAsString(readinessResult));
+
+                // Publish structured readiness result incase another consume wants to use
                 kafkaProducerService.sendMessage("tls-analysis-results", scanResult.getDomain(), objectMapper.writeValueAsString(readinessResult));
             }
 

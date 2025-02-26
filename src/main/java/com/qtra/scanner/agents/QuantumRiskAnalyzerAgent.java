@@ -28,8 +28,11 @@ public class QuantumRiskAnalyzerAgent {
             "TLS_CHACHA20_POLY1305_SHA256"
     );
 
-    public QuantumReadinessResult analyze(TLSScanResult scanResult, boolean hstsEnabled, boolean dnssecEnabled) {
+    public QuantumReadinessResult analyze(TLSScanResult scanResult) {
         QuantumSafetyLevel safetyLevel = classifyCipher(scanResult.getCipherSuite());
+
+        boolean hstsEnabled = checkHSTS(scanResult.getDomain());
+        boolean dnssecEnabled = checkDNSSEC(scanResult.getDomain());
 
         double cipherStrengthScore = calculateCipherStrengthScore(scanResult.getCipherSuite());
         double tlsVersionScore = calculateTLSVersionScore(scanResult.getProtocol());
