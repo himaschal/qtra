@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.agents.QuantumRiskAnalyzerAgent;
 import com.qtra.scanner.agents.ReportGeneratorAgent;
 import com.qtra.scanner.config.KafkaConsumerConfig;
+import com.qtra.scanner.dto.QuantumReadinessResult;
 import com.qtra.scanner.dto.TLSScanResult;
 import com.qtra.scanner.service.KafkaProducerService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -82,11 +83,15 @@ public class KafkaConsumerService {
             List<TLSScanResult> scanResults = objectMapper.readValue(json, new TypeReference<>() {});
 
             for (TLSScanResult scanResult : scanResults) {
-                // Assign QuantumSafetyLevel
-                TLSScanResult enrichedResult = quantumRiskAnalyzerAgent.process(scanResult);
+                // Check security features
+                boolean hstsEnabled = quantumRiskAnalyzerAgent.checkHSTS(scanResult.getDomain());
+                boolean dnssecEnabled = quantumRiskAnalyzerAgent.checkDNSSEC(scanResult.getDomain());
 
-                // Publish enriched result
-                kafkaProducerService.sendMessage("tls-analysis-results", scanResult.getDomain(), objectMapper.writeValueAsString(enrichedResult));
+                // Generate structured readiness result
+                QuantumReadinessResult readinessResult = quantumRiskAnalyzerAgent.analyze(scanResult, hstsEnabled, dnssecEnabled);
+
+                // Publish structured readiness result
+                kafkaProducerService.sendMessage("tls-analysis-results", scanResult.getDomain(), objectMapper.writeValueAsString(readinessResult));
             }
 
         } catch (Exception e) {

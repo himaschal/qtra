@@ -64,6 +64,13 @@
 			<version>2.3.0</version>
 		</dependency>
 
+		<!-- dns lookups etc -->
+		<dependency>
+			<groupId>dnsjava</groupId>
+			<artifactId>dnsjava</artifactId>
+			<version>3.5.2</version>  <!-- Use latest version -->
+		</dependency>
+
 	</dependencies>
 
 	<dependencyManagement>
