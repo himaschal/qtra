@@ -1,70 +1,34 @@
 package com.qtra.scanner.agents;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.dto.QuantumReadinessResult;
-import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
-
+@Slf4j
 @Service
 public class ReportGeneratorAgent {
 
-    private static final Logger logger = LoggerFactory.getLogger(ReportGeneratorAgent.class);
-
-    private final KafkaConsumer<String, String> kafkaConsumer;
     private final ObjectMapper objectMapper;
 
-    public ReportGeneratorAgent(KafkaConsumer<String, String> kafkaConsumer, ObjectMapper objectMapper) {
-        this.kafkaConsumer = kafkaConsumer;
+    public ReportGeneratorAgent(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    @PostConstruct
-    public void init() {
-        this.kafkaConsumer.subscribe(Collections.singletonList("tls-analysis-results"));
-        logger.info("Subscribed to Kafka topic: tls-analysis-results");
-    }
-
-    @Scheduled(fixedDelay = 1000)
-    public void pollMessages() {
-        ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(100));
-        for (ConsumerRecord<String, String> record : records) {
-            processRecord(record);
-        }
-        kafkaConsumer.commitSync();
-    }
-
-    private void processRecord(ConsumerRecord<String, String> record) {
+    @KafkaListener(topics = "${spring.kafka.topics.tls-quantum-results}", groupId = "report-generator-group")
+    public void consumeQuantumResults(String message) {
         try {
-            String json = record.value();
-
-            // Deserialize as a list instead of a single object
-            List<QuantumReadinessResult> readinessResults = objectMapper.readValue(json, new TypeReference<>() {
-            });
-
-            for (QuantumReadinessResult result : readinessResults) {
-                generateReport(result);
-            }
-
+            QuantumReadinessResult readinessResult = objectMapper.readValue(message, QuantumReadinessResult.class);
+            generateReport(readinessResult);
         } catch (Exception e) {
-            logger.error("Error processing Kafka message: ", e);
+            log.error("❌ Error processing Kafka message: ", e);
         }
     }
 
-    public void generateReport(QuantumReadinessResult readinessResult) {
+    private void generateReport(QuantumReadinessResult readinessResult) {
         String report = String.format("""
-            📌 Quantum Readiness Report for %s
+            📌 **Quantum Readiness Report for %s**
             --------------------------------------------------
             🔹 Quantum Safety Level: %s
             🔹 Cipher Strength Score: %.1f/40
@@ -84,6 +48,6 @@ public class ReportGeneratorAgent {
                 readinessResult.getDnssecScore(),
                 readinessResult.getTotalReadinessScore());
 
-        logger.info(report);
+        log.info(report);
     }
 }

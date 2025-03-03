@@ -27,6 +27,7 @@ public class KafkaProducerService {
     }
 
     public void sendMessage(String topic, String key, Object value) {
+        logger.info("Sending message to topic: {}, key: {}, value: {}", topic, key, value);
         try {
             // Ensure JSON is serialized only once
             String json = (value instanceof String) ? (String) value : objectMapper.writeValueAsString(value);

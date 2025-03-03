@@ -1,11 +1,14 @@
 package com.qtra.scanner.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qtra.scanner.ai.VulnerabilityPredictor;
 import com.qtra.scanner.enums.QuantumSafetyLevel;
 import com.qtra.scanner.dto.TLSScanResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
 import javax.net.ssl.*;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -19,9 +22,15 @@ public class TLSScanner {
     private static final Logger logger = LoggerFactory.getLogger(TLSScanner.class);
     private final KafkaProducerService kafkaProducerService;
     private final ObjectMapper objectMapper;
+    private final VulnerabilityPredictor vulnerabilityPredictor;
 
-    public TLSScanner(KafkaProducerService kafkaProducerService) {
+    @Value("${spring.kafka.topics.tls-scan-results}")
+    private String scanResultsTopic;
+
+
+    public TLSScanner(KafkaProducerService kafkaProducerService, VulnerabilityPredictor vulnerabilityPredictor) {
         this.kafkaProducerService = kafkaProducerService;
+        this.vulnerabilityPredictor = vulnerabilityPredictor;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -30,13 +39,13 @@ public class TLSScanner {
      * @param domain The primary domain to scan.
      */
     public void scanAndPublish(String domain) {
-        CompletableFuture<List<TLSScanResult>> futureResults = scanWithSubdomains(domain);
-        futureResults.thenAccept(results -> {
+        scanWithSubdomains(domain).thenAccept(scanResults -> {
             try {
-                String jsonResults = objectMapper.writeValueAsString(results);
-                kafkaProducerService.sendMessage("tls-scan-results", domain, jsonResults);
+                String jsonResult = objectMapper.writeValueAsString(scanResults);
+                kafkaProducerService.sendMessage(scanResultsTopic, domain, jsonResult);
+                logger.info("📤 Published TLS scan results for {} with {} subdomains", domain, scanResults.size());
             } catch (Exception e) {
-                logger.error("Error publishing TLS scan results: ", e);
+                logger.error("❌ Error serializing scan results for {}: {}", domain, e.getMessage());
             }
         });
     }
@@ -78,11 +87,17 @@ public class TLSScanner {
             String cipherSuite = session.getCipherSuite();
             sslSocket.close();
 
-            logger.info("✅ Scanned {}: Protocol={}, Cipher={}", domain, protocol, cipherSuite);
-            return new TLSScanResult(domain, protocol, cipherSuite);
+            TLSScanResult scanResult = new TLSScanResult(domain, protocol, cipherSuite, 0.0);
+
+            // Compute vulnerability risk score before publishing
+            double riskScore = vulnerabilityPredictor.predictRisk(scanResult);
+            scanResult.setRiskScore(riskScore);
+
+            logger.info("✅ Scanned {}: Protocol={}, Cipher={}, Risk Score={}", domain, protocol, cipherSuite, riskScore);
+            return scanResult;
         } catch (Exception e) {
             logger.warn("⚠️ Failed to scan TLS for {}: {}", domain, e.getMessage());
-            return new TLSScanResult(domain, "UNKNOWN", "UNKNOWN");
+            return new TLSScanResult(domain, "UNKNOWN", "UNKNOWN", 1.0); // Default high risk for errors
         }
     }
 
@@ -137,4 +152,3 @@ public class TLSScanner {
         }
     }
 }
-

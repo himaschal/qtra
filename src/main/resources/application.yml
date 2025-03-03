@@ -1,0 +1,39 @@
+spring:
+  kafka:
+    bootstrap-servers: qtra-kafka:9092
+    consumer:
+      group-id: tls-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    listener:
+      missing-topics-fatal: false
+    topics:
+      tls-scan-results: tls-scan-results
+      tls-quantum-results: tls-quantum-results
+      tls-analysis-results: tls-analysis-results
+      tls-scan-requests-topic: tls-scan-requests-topic
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+logging:
+  level:
+    root: INFO
+    org.springframework.kafka: INFO
+    com.qtra.scanner: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
