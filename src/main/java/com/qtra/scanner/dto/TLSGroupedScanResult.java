@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 @AllArgsConstructor
-@NoArgsConstructorsrc/main/java/com/qtra/scanner/dto/TLSGroupedScanResult.java
+@NoArgsConstructor
 public class TLSGroupedScanResult {
     private String rootDomain;
     private List<TLSScanResult> subdomains;
