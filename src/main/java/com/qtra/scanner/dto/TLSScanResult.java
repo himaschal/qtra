@@ -1,23 +1,20 @@
 package com.qtra.scanner.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor // ✅ Add this to allow Jackson to instantiate objects
+@NoArgsConstructor // Add this to allow Jackson to instantiate objects
 public class TLSScanResult {
     private String domain;
     private String protocol;
     private String cipherSuite;
     private double riskScore;
 
-    @JsonCreator // ✅ Explicitly tell Jackson how to deserialize
+    @JsonCreator // Explicitly tell Jackson how to deserialize
     public TLSScanResult(
             @JsonProperty("domain") String domain,
             @JsonProperty("protocol") String protocol,

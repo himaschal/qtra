@@ -14,8 +14,8 @@ spring:
     topics:
       tls-scan-results: tls-scan-results
       tls-quantum-results: tls-quantum-results
-      tls-analysis-results: tls-analysis-results
       tls-scan-requests-topic: tls-scan-requests-topic
+      tls-report-results: tls-report-results
 
 server:
   port: 8080

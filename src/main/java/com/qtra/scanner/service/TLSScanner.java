@@ -2,6 +2,7 @@ package com.qtra.scanner.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qtra.scanner.ai.VulnerabilityPredictor;
+import com.qtra.scanner.dto.TLSGroupedScanResult;
 import com.qtra.scanner.enums.QuantumSafetyLevel;
 import com.qtra.scanner.dto.TLSScanResult;
 import org.slf4j.Logger;
@@ -36,16 +37,17 @@ public class TLSScanner {
 
     /**
      * Scans a domain and its subdomains asynchronously, then publishes results to Kafka.
-     * @param domain The primary domain to scan.
+     * @param rootDomain The primary domain to scan.
      */
-    public void scanAndPublish(String domain) {
-        scanWithSubdomains(domain).thenAccept(scanResults -> {
+    public void scanAndPublish(String rootDomain) {
+        scanWithSubdomains(rootDomain).thenAccept(subdomainResults -> {
+            TLSGroupedScanResult groupedResult = new TLSGroupedScanResult(rootDomain, subdomainResults);
+
             try {
-                String jsonResult = objectMapper.writeValueAsString(scanResults);
-                kafkaProducerService.sendMessage(scanResultsTopic, domain, jsonResult);
-                logger.info("📤 Published TLS scan results for {} with {} subdomains", domain, scanResults.size());
+                String jsonResult = objectMapper.writeValueAsString(groupedResult);
+                kafkaProducerService.sendMessage(scanResultsTopic, rootDomain, jsonResult);
             } catch (Exception e) {
-                logger.error("❌ Error serializing scan results for {}: {}", domain, e.getMessage());
+                logger.error("Error serializing scan results", e);
             }
         });
     }

@@ -2,7 +2,9 @@ package com.qtra.scanner.agents;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qtra.scanner.dto.QuantumGroupedReadinessResult;
 import com.qtra.scanner.dto.QuantumReadinessResult;
+import com.qtra.scanner.dto.TLSGroupedScanResult;
 import com.qtra.scanner.dto.TLSScanResult;
 import com.qtra.scanner.enums.QuantumSafetyLevel;
 import com.qtra.scanner.service.KafkaProducerService;
@@ -48,14 +50,31 @@ public class QuantumRiskAnalyzerAgent {
     @KafkaListener(topics = "${spring.kafka.topics.tls-scan-results}", groupId = "ai-agent-group")
     public void analyzeTLSScanResults(String message) {
         try {
-            List<TLSScanResult> scanResults = objectMapper.readValue(message, new TypeReference<>() {});
-            for (TLSScanResult scanResult : scanResults) {
-                QuantumReadinessResult readinessResult = analyze(scanResult);
-                kafkaProducerService.sendMessage(quantumResultsTopic, scanResult.getDomain(), objectMapper.writeValueAsString(readinessResult));
-            }
+            // Deserialize grouped results
+            TLSGroupedScanResult groupedResult = objectMapper.readValue(message, TLSGroupedScanResult.class);
+
+            List<QuantumReadinessResult> analyzedResults = groupedResult.getSubdomains().stream()
+                    .map(this::analyze)  // Apply quantum risk analysis
+                    .toList();
+
+            // Aggregate overall quantum readiness score for the root domain
+            double avgReadinessScore = analyzedResults.stream()
+                    .mapToDouble(QuantumReadinessResult::getTotalReadinessScore)
+                    .average().orElse(0.0);
+
+            // Create grouped quantum readiness result
+            QuantumGroupedReadinessResult finalResult = new QuantumGroupedReadinessResult(
+                    groupedResult.getRootDomain(), analyzedResults, avgReadinessScore
+            );
+
+            // Publish the aggregated result
+            String jsonResult = objectMapper.writeValueAsString(finalResult);
+            kafkaProducerService.sendMessage(quantumResultsTopic, groupedResult.getRootDomain(), jsonResult);
+
         } catch (Exception e) {
-            log.error("Error processing Kafka message: ", e);
+            log.error("Error processing TLS scan results", e);
         }
+
     }
 
     public QuantumReadinessResult analyze(TLSScanResult scanResult) {
